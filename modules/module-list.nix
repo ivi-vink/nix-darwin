@@ -92,5 +92,6 @@
   ./programs/vim.nix
   ./programs/zsh
   ./homebrew.nix
+  ./services/syncthing.nix
   ./users
 ]

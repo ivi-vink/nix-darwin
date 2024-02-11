@@ -51,6 +51,9 @@ let
     # be careful not to leak secrets in the filesystem or in process listings
     umask 0077
 
+    mkdir -p /tmp/syncthing-init
+    RUNTIME_DIRECTORY=/tmp/syncthing-init
+
     curl() {
         # get the api key by parsing the config.xml
         while
@@ -541,21 +544,14 @@ in {
         '';
       };
 
-      configDir = let
-        cond = versionAtLeast config.system.stateVersion "19.03";
-      in mkOption {
+      configDir = mkOption {
         type = types.path;
         description = lib.mdDoc ''
           The path where the settings and keys will exist.
         '';
-        default = cfg.dataDir + optionalString cond "/.config/syncthing";
+        default = cfg.dataDir + "/.config/syncthing";
         defaultText = literalMD ''
-          * if `stateVersion >= 19.03`:
-
-                config.${opt.dataDir} + "/.config/syncthing"
-          * otherwise:
-
-                config.${opt.dataDir}
+          config.${opt.dataDir} + "/.config/syncthing"
         '';
       };
 
@@ -619,104 +615,107 @@ in {
   ###### implementation
 
   config = mkIf cfg.enable {
+    environment.systemPackages = [ cfg.package ];
 
-    networking.firewall = mkIf cfg.openDefaultPorts {
-      allowedTCPPorts = [ 22000 ];
-      allowedUDPPorts = [ 21027 22000 ];
+    launchd.user.agents.syncthing = {
+      script = ''
+        install -dm700 -o ${cfg.user} -g ${cfg.group} ${cfg.configDir}
+        ${optionalString (cfg.cert != null) ''
+          install -m400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.cert} ${cfg.configDir}/cert.pem
+        ''}
+        ${optionalString (cfg.key != null) ''
+          install -m400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.key} ${cfg.configDir}/key.pem
+        ''}
+        exec ${cfg.package}/bin/syncthing \
+        -no-browser \
+        -gui-address=${if isUnixGui then "unix://" else ""}${cfg.guiAddress} \
+        -config=${cfg.configDir} \
+        -data=${cfg.databaseDir} \
+        ${escapeShellArgs cfg.extraFlags}
+      '';
+      serviceConfig.KeepAlive = true;
+      serviceConfig.RunAtLoad = true;
     };
-
-    systemd.packages = [ pkgs.syncthing ];
-
-    users.users = mkIf (cfg.systemService && cfg.user == defaultUser) {
-      ${defaultUser} =
-        { group = cfg.group;
-          home  = cfg.dataDir;
-          createHome = true;
-          uid = config.ids.uids.syncthing;
-          description = "Syncthing daemon user";
-        };
+    launchd.user.agents.syncthing-init = {
+      command = updateConfig;
+      serviceConfig.RunAtLoad = true;
+      serviceConfig.KeepAlive.SuccessfulExit = false;
     };
+    # systemd.services = {
+    #   # upstream reference:
+    #   # https://github.com/syncthing/syncthing/blob/main/etc/linux-systemd/system/syncthing%40.service
+    #   syncthing = mkIf cfg.systemService {
+    #     description = "Syncthing service";
+    #     after = [ "network.target" ];
+    #     environment = {
+    #       STNORESTART = "yes";
+    #       STNOUPGRADE = "yes";
+    #       inherit (cfg) all_proxy;
+    #     } // config.networking.proxy.envVars;
+    #     wantedBy = [ "multi-user.target" ];
+    #     serviceConfig = {
+    #       Restart = "on-failure";
+    #       SuccessExitStatus = "3 4";
+    #       RestartForceExitStatus="3 4";
+    #       User = cfg.user;
+    #       Group = cfg.group;
+    #       ExecStartPre = mkIf (cfg.cert != null || cfg.key != null)
+    #         "+${pkgs.writers.writeBash "syncthing-copy-keys" ''
+    #           install -dm700 -o ${cfg.user} -g ${cfg.group} ${cfg.configDir}
+    #           ${optionalString (cfg.cert != null) ''
+    #             install -Dm400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.cert} ${cfg.configDir}/cert.pem
+    #           ''}
+    #           ${optionalString (cfg.key != null) ''
+    #             install -Dm400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.key} ${cfg.configDir}/key.pem
+    #           ''}
+    #         ''}"
+    #       ;
+    #       ExecStart = ''
+    #         ${cfg.package}/bin/syncthing \
+    #           -no-browser \
+    #           -gui-address=${if isUnixGui then "unix://" else ""}${cfg.guiAddress} \
+    #           -config=${cfg.configDir} \
+    #           -data=${cfg.databaseDir} \
+    #           ${escapeShellArgs cfg.extraFlags}
+    #       '';
+    #       MemoryDenyWriteExecute = true;
+    #       NoNewPrivileges = true;
+    #       PrivateDevices = true;
+    #       PrivateMounts = true;
+    #       PrivateTmp = true;
+    #       PrivateUsers = true;
+    #       ProtectControlGroups = true;
+    #       ProtectHostname = true;
+    #       ProtectKernelModules = true;
+    #       ProtectKernelTunables = true;
+    #       RestrictNamespaces = true;
+    #       RestrictRealtime = true;
+    #       RestrictSUIDSGID = true;
+    #       CapabilityBoundingSet = [
+    #         "~CAP_SYS_PTRACE" "~CAP_SYS_ADMIN"
+    #         "~CAP_SETGID" "~CAP_SETUID" "~CAP_SETPCAP"
+    #         "~CAP_SYS_TIME" "~CAP_KILL"
+    #       ];
+    #     };
+    #   };
+    #   syncthing-init = mkIf (cleanedConfig != {}) {
+    #     description = "Syncthing configuration updater";
+    #     requisite = [ "syncthing.service" ];
+    #     after = [ "syncthing.service" ];
+    #     wantedBy = [ "multi-user.target" ];
 
-    users.groups = mkIf (cfg.systemService && cfg.group == defaultGroup) {
-      ${defaultGroup}.gid =
-        config.ids.gids.syncthing;
-    };
+    #     serviceConfig = {
+    #       User = cfg.user;
+    #       RemainAfterExit = true;
+    #       RuntimeDirectory = "syncthing-init";
+    #       Type = "oneshot";
+    #       ExecStart = updateConfig;
+    #     };
+    #   };
 
-    systemd.services = {
-      # upstream reference:
-      # https://github.com/syncthing/syncthing/blob/main/etc/linux-systemd/system/syncthing%40.service
-      syncthing = mkIf cfg.systemService {
-        description = "Syncthing service";
-        after = [ "network.target" ];
-        environment = {
-          STNORESTART = "yes";
-          STNOUPGRADE = "yes";
-          inherit (cfg) all_proxy;
-        } // config.networking.proxy.envVars;
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig = {
-          Restart = "on-failure";
-          SuccessExitStatus = "3 4";
-          RestartForceExitStatus="3 4";
-          User = cfg.user;
-          Group = cfg.group;
-          ExecStartPre = mkIf (cfg.cert != null || cfg.key != null)
-            "+${pkgs.writers.writeBash "syncthing-copy-keys" ''
-              install -dm700 -o ${cfg.user} -g ${cfg.group} ${cfg.configDir}
-              ${optionalString (cfg.cert != null) ''
-                install -Dm400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.cert} ${cfg.configDir}/cert.pem
-              ''}
-              ${optionalString (cfg.key != null) ''
-                install -Dm400 -o ${cfg.user} -g ${cfg.group} ${toString cfg.key} ${cfg.configDir}/key.pem
-              ''}
-            ''}"
-          ;
-          ExecStart = ''
-            ${cfg.package}/bin/syncthing \
-              -no-browser \
-              -gui-address=${if isUnixGui then "unix://" else ""}${cfg.guiAddress} \
-              -config=${cfg.configDir} \
-              -data=${cfg.databaseDir} \
-              ${escapeShellArgs cfg.extraFlags}
-          '';
-          MemoryDenyWriteExecute = true;
-          NoNewPrivileges = true;
-          PrivateDevices = true;
-          PrivateMounts = true;
-          PrivateTmp = true;
-          PrivateUsers = true;
-          ProtectControlGroups = true;
-          ProtectHostname = true;
-          ProtectKernelModules = true;
-          ProtectKernelTunables = true;
-          RestrictNamespaces = true;
-          RestrictRealtime = true;
-          RestrictSUIDSGID = true;
-          CapabilityBoundingSet = [
-            "~CAP_SYS_PTRACE" "~CAP_SYS_ADMIN"
-            "~CAP_SETGID" "~CAP_SETUID" "~CAP_SETPCAP"
-            "~CAP_SYS_TIME" "~CAP_KILL"
-          ];
-        };
-      };
-      syncthing-init = mkIf (cleanedConfig != {}) {
-        description = "Syncthing configuration updater";
-        requisite = [ "syncthing.service" ];
-        after = [ "syncthing.service" ];
-        wantedBy = [ "multi-user.target" ];
-
-        serviceConfig = {
-          User = cfg.user;
-          RemainAfterExit = true;
-          RuntimeDirectory = "syncthing-init";
-          Type = "oneshot";
-          ExecStart = updateConfig;
-        };
-      };
-
-      syncthing-resume = {
-        wantedBy = [ "suspend.target" ];
-      };
-    };
+    #   syncthing-resume = {
+    #     wantedBy = [ "suspend.target" ];
+    #   };
+    # };
   };
 }
