@@ -119,12 +119,14 @@ let
     tests.services-activate-system = makeTest ./tests/services-activate-system.nix;
     tests.services-activate-system-changed-label-prefix = makeTest ./tests/services-activate-system-changed-label-prefix.nix;
     tests.services-buildkite-agent = makeTest ./tests/services-buildkite-agent.nix;
+    tests.services-github-runners = makeTest ./tests/services-github-runners.nix;
     tests.services-lorri = makeTest ./tests/services-lorri.nix;
     tests.services-nix-daemon = makeTest ./tests/services-nix-daemon.nix;
     tests.sockets-nix-daemon = makeTest ./tests/sockets-nix-daemon.nix;
     tests.services-dnsmasq = makeTest ./tests/services-dnsmasq.nix;
     tests.services-eternal-terminal = makeTest ./tests/services-eternal-terminal.nix;
     tests.services-nix-gc = makeTest ./tests/services-nix-gc.nix;
+    tests.services-nix-optimise = makeTest ./tests/services-nix-optimise.nix;
     tests.services-nextdns = makeTest ./tests/services-nextdns.nix;
     tests.services-ofborg = makeTest ./tests/services-ofborg.nix;
     tests.services-offlineimap = makeTest ./tests/services-offlineimap.nix;
