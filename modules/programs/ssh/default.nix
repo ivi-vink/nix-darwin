@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg  = config.programs.ssh;
+  cfg = config.programs.ssh;
 
   knownHosts = map (h: getAttr h cfg.knownHosts) (attrNames cfg.knownHosts);
 
@@ -11,10 +11,18 @@ let
     { name, ... }:
     {
       options = {
+        certAuthority = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = ''
+            This public key is an SSH certificate authority, rather than an
+            individual host's key.
+          '';
+        };
         hostNames = mkOption {
           type = types.listOf types.str;
           default = [];
-          description = lib.mdDoc ''
+          description = ''
             A list of host names and/or IP numbers used for accessing
             the host's ssh service.
           '';
@@ -23,7 +31,7 @@ let
           default = null;
           type = types.nullOr types.str;
           example = "ecdsa-sha2-nistp521 AAAAE2VjZHN...UEPg==";
-          description = lib.mdDoc ''
+          description = ''
             The public key data for the host. You can fetch a public key
             from a running SSH server with the {command}`ssh-keyscan`
             command. The public key should not include any host names, only
@@ -33,7 +41,7 @@ let
         publicKeyFile = mkOption {
           default = null;
           type = types.nullOr types.path;
-          description = lib.mdDoc ''
+          description = ''
             The path to the public key file for the host. The public
             key file is read at build time and saved in the Nix store.
             You can fetch a public key file from a running SSH server
@@ -54,7 +62,7 @@ let
       keys = mkOption {
         type = types.listOf types.str;
         default = [];
-        description = lib.mdDoc ''
+        description = ''
           A list of verbatim OpenSSH public keys that should be added to the
           user's authorized keys. The keys are added to a file that the SSH
           daemon reads in addition to the the user's authorized_keys file.
@@ -68,7 +76,7 @@ let
       keyFiles = mkOption {
         type = types.listOf types.path;
         default = [];
-        description = lib.mdDoc ''
+        description = ''
           A list of files each containing one OpenSSH public key that should be
           added to the user's authorized keys. The contents of the files are
           read at build time and added to a file that the SSH daemon reads in
@@ -81,8 +89,7 @@ let
   };
 
   authKeysFiles = let
-    mkAuthKeyFile = u: nameValuePair "ssh/authorized_keys.d/${u.name}" {
-      copy = true;
+    mkAuthKeyFile = u: nameValuePair "ssh/nix_authorized_keys.d/${u.name}" {
       text = ''
         ${concatStringsSep "\n" u.openssh.authorizedKeys.keys}
         ${concatMapStrings (f: readFile f + "\n") u.openssh.authorizedKeys.keyFiles}
@@ -97,32 +104,29 @@ let
 in
 
 {
+  imports = [
+    (mkRemovedOptionModule [ "services" "openssh" "authorizedKeysFiles" ] "No `nix-darwin` equivalent to this NixOS option.")
+  ];
+
   options = {
 
     users.users = mkOption {
       type = with types; attrsOf (submodule userOptions);
     };
 
-    services.openssh.authorizedKeysFiles = mkOption {
-      type = types.listOf types.str;
-      default = [];
-      description = lib.mdDoc ''
-        Specify the rules for which files to read on the host.
-
-        This is an advanced option. If you're looking to configure user
-        keys, you can generally use [](#opt-users.users._name_.openssh.authorizedKeys.keys)
-        or [](#opt-users.users._name_.openssh.authorizedKeys.keyFiles).
-
-        These are paths relative to the host root file system or home
-        directories and they are subject to certain token expansion rules.
-        See AuthorizedKeysFile in man sshd_config for details.
+    programs.ssh.extraConfig = lib.mkOption {
+      type = lib.types.lines;
+      default = "";
+      description = ''
+        Extra configuration text loaded in {file}`ssh_config`.
+        See {manpage}`ssh_config(5)` for help.
       '';
     };
 
     programs.ssh.knownHosts = mkOption {
       default = {};
       type = types.attrsOf (types.submodule host);
-      description = lib.mdDoc ''
+      description = ''
         The set of system-wide known SSH hosts.
       '';
       example = literalExpression ''
@@ -148,25 +152,30 @@ in
       message = "knownHost ${name} must contain either a publicKey or publicKeyFile";
     });
 
-    services.openssh.authorizedKeysFiles = [ "%h/.ssh/authorized_keys" "/etc/ssh/authorized_keys.d/%u" ];
-
     environment.etc = authKeysFiles //
       { "ssh/ssh_known_hosts" = mkIf (builtins.length knownHosts > 0) {
           text = (flip (concatMapStringsSep "\n") knownHosts
             (h: assert h.hostNames != [];
-              concatStringsSep "," h.hostNames + " "
+              lib.optionalString h.certAuthority "@cert-authority " + concatStringsSep "," h.hostNames + " "
               + (if h.publicKey != null then h.publicKey else readFile h.publicKeyFile)
             )) + "\n";
         };
+        "ssh/ssh_config.d/100-nix-darwin.conf".text = config.programs.ssh.extraConfig;
         "ssh/sshd_config.d/101-authorized-keys.conf" = {
-          text = "AuthorizedKeysFile ${toString config.services.openssh.authorizedKeysFiles}\n";
+          text = ''
+            # sshd doesn't like reading from symbolic links, so we cat
+            # the file ourselves.
+            AuthorizedKeysCommand /bin/cat /etc/ssh/nix_authorized_keys.d/%u
+            # Just a simple cat, fine to use _sshd.
+            AuthorizedKeysCommandUser _sshd
+          '';
           # Allows us to automatically migrate from using a file to a symlink
           knownSha256Hashes = [ oldAuthorizedKeysHash ];
         };
       };
 
-    # Clean up .before-nix-darwin file left over from using knownSha256Hashes
     system.activationScripts.etc.text = ''
+      # Clean up .before-nix-darwin file left over from using knownSha256Hashes
       auth_keys_orig=/etc/ssh/sshd_config.d/101-authorized-keys.conf.before-nix-darwin
 
       if [ -e "$auth_keys_orig" ] && [ "$(shasum -a 256 $auth_keys_orig | cut -d ' ' -f 1)" = "${oldAuthorizedKeysHash}" ]; then

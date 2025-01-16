@@ -1,10 +1,14 @@
 { config, lib, pkgs, ... }:
-with lib;
+
 let
+  inherit (lib) any attrValues boolToString concatStringsSep escapeShellArg
+    flatten flip getExe getExe' hasAttr hasPrefix mapAttrsToList mapAttrs' mkBefore
+    mkDefault mkIf mkMerge nameValuePair optionalAttrs optionalString replaceStrings;
+
   mkSvcName = name: "github-runner-${name}";
   mkStateDir = cfg: "/var/lib/github-runners/${cfg.name}";
   mkLogDir = cfg: "/var/log/github-runners/${cfg.name}";
-  mkWorkDir = cfg: if (cfg.workDir != null) then cfg.workDir else "/var/run/github-runners/${cfg.name}";
+  mkWorkDir = cfg: if (cfg.workDir != null) then cfg.workDir else "/var/lib/github-runners/_work/${cfg.name}";
 in
 {
   config.assertions = flatten (
@@ -16,6 +20,10 @@ in
       {
         assertion = !cfg.noDefaultLabels || (cfg.extraLabels != [ ]);
         message = "`services.github-runners.${name}`: The `extraLabels` option is mandatory if `noDefaultLabels` is set";
+      }
+      {
+        assertion = cfg.workDir == null || !(hasPrefix "/run/" cfg.workDir || hasPrefix "/var/run/" cfg.workDir || hasPrefix "/private/var/run/");
+        message = "`services.github-runners.${name}`: `workDir` being inside /run is not supported";
       }
     ])
   );
@@ -44,14 +52,22 @@ in
         text = mkBefore (''
           echo >&2 "setting up GitHub Runner '${cfg.name}'..."
 
-          ${pkgs.coreutils}/bin/mkdir -p -m 0750 ${escapeShellArg (mkStateDir cfg)}
-          ${pkgs.coreutils}/bin/chown ${user}:${group} ${escapeShellArg (mkStateDir cfg)}
+          (
+            umask -S u=rwx,g=rx,o= > /dev/null
 
-          ${pkgs.coreutils}/bin/mkdir -p -m 0750 ${escapeShellArg (mkLogDir cfg)}
-          ${pkgs.coreutils}/bin/chown ${user}:${group} ${escapeShellArg (mkLogDir cfg)}
-        '' + optionalString (cfg.workDir == null) ''
-          ${pkgs.coreutils}/bin/mkdir -p -m 0750 ${escapeShellArg (mkWorkDir cfg)}
-          ${pkgs.coreutils}/bin/chown ${user}:${group} ${escapeShellArg (mkWorkDir cfg)}
+            ${getExe' pkgs.coreutils "mkdir"} -p ${escapeShellArg (mkStateDir cfg)}
+            ${getExe' pkgs.coreutils "chown"} ${user}:${group} ${escapeShellArg (mkStateDir cfg)}
+
+            ${getExe' pkgs.coreutils "mkdir"} -p ${escapeShellArg (mkLogDir cfg)}
+            # launchd will fail to start the service if the outer direction doesn't have sufficient permissions
+            ${getExe' pkgs.coreutils "chmod"} o+rx ${escapeShellArg (mkLogDir { name = ""; })}
+            ${getExe' pkgs.coreutils "chown"} ${user}:${group} ${escapeShellArg (mkLogDir cfg)}
+
+            ${optionalString (cfg.workDir == null) ''
+              ${getExe' pkgs.coreutils "mkdir"} -p ${escapeShellArg (mkWorkDir cfg)}
+              ${getExe' pkgs.coreutils "chown"} ${user}:${group} ${escapeShellArg (mkWorkDir cfg)}
+            ''}
+          )
         '');
       };
     }));
@@ -84,9 +100,13 @@ in
 
         script =
           let
+            # https://github.com/NixOS/nixpkgs/pull/333744 introduced an inconsistency with different
+            # versions of nixpkgs. Use the old version of escapeShellArg to make sure that labels
+            # are always escaped to avoid https://www.shellcheck.net/wiki/SC2054
+            escapeShellArgAlways = string: "'${replaceStrings ["'"] ["'\\''"] (toString string)}'";
             configure = pkgs.writeShellApplication {
               name = "configure-github-runner-${name}";
-              text = ''
+              text = /*bash*/''
                 export RUNNER_ROOT
 
                 args=(
@@ -94,7 +114,7 @@ in
                   --disableupdate
                   --work ${escapeShellArg workDir}
                   --url ${escapeShellArg cfg.url}
-                  --labels ${escapeShellArg (concatStringsSep "," cfg.extraLabels)}
+                  --labels ${escapeShellArgAlways (concatStringsSep "," cfg.extraLabels)}
                   ${optionalString (cfg.name != null ) "--name ${escapeShellArg cfg.name}"}
                   ${optionalString cfg.replace "--replace"}
                   ${optionalString (cfg.runnerGroup != null) "--runnergroup ${escapeShellArg cfg.runnerGroup}"}
@@ -109,7 +129,7 @@ in
                 else
                   args+=(--token "$token")
                 fi
-                ${package}/bin/config.sh "''${args[@]}"
+                ${getExe' package "config.sh"} "''${args[@]}"
               '';
             };
           in
@@ -117,12 +137,12 @@ in
             echo "Configuring GitHub Actions Runner"
 
             # Always clean the working directory
-            ${pkgs.findutils}/bin/find ${escapeShellArg workDir} -mindepth 1 -delete
+            ${getExe pkgs.findutils} ${escapeShellArg workDir} -mindepth 1 -delete
 
             # Clean the $RUNNER_ROOT if we are in ephemeral mode
             if ${boolToString cfg.ephemeral}; then
               echo "Cleaning $RUNNER_ROOT"
-              ${pkgs.findutils}/bin/find "$RUNNER_ROOT" -mindepth 1 -delete
+              ${getExe pkgs.findutils} "$RUNNER_ROOT" -mindepth 1 -delete
             fi
 
             # If the `.runner` file does not exist, we assume the runner is not configured
@@ -131,7 +151,7 @@ in
             fi
 
             # Start the service
-            ${package}/bin/Runner.Listener run --startuptype service
+            ${getExe' package "Runner.Listener"} run --startuptype service
           '';
 
         serviceConfig = mkMerge [

@@ -11,38 +11,44 @@ in
     system.keyboard.enableKeyMapping = mkOption {
       type = types.bool;
       default = false;
-      description = lib.mdDoc "Whether to enable keyboard mappings.";
+      description = "Whether to enable keyboard mappings.";
     };
 
     system.keyboard.remapCapsLockToControl = mkOption {
       type = types.bool;
       default = false;
-      description = lib.mdDoc "Whether to remap the Caps Lock key to Control.";
+      description = "Whether to remap the Caps Lock key to Control.";
     };
 
     system.keyboard.remapCapsLockToEscape = mkOption {
       type = types.bool;
       default = false;
-      description = lib.mdDoc "Whether to remap the Caps Lock key to Escape.";
+      description = "Whether to remap the Caps Lock key to Escape.";
     };
 
     system.keyboard.nonUS.remapTilde = mkOption {
       type = types.bool;
       default = false;
-      description = lib.mdDoc "Whether to remap the Tilde key on non-us keyboards.";
+      description = "Whether to remap the Tilde key on non-us keyboards.";
     };
 
     system.keyboard.swapLeftCommandAndLeftAlt = mkOption {
       type = types.bool;
       default = false;
-      description = lib.mdDoc "Whether to swap the left Command key and left Alt key.";
+      description = "Whether to swap the left Command key and left Alt key.";
+    };
+
+    system.keyboard.swapLeftCtrlAndFn = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Whether to swap the left Control key and Fn (Globe) key.";
     };
 
     system.keyboard.userKeyMapping = mkOption {
       internal = true;
       type = types.listOf (types.attrsOf types.int);
       default = [];
-      description = lib.mdDoc ''
+      description = ''
         List of keyboard mappings to apply, for more information see
         <https://developer.apple.com/library/content/technotes/tn2450/_index.html>.
       '';
@@ -65,6 +71,14 @@ in
       (mkIf cfg.swapLeftCommandAndLeftAlt {
         HIDKeyboardModifierMappingSrc = 30064771298;
         HIDKeyboardModifierMappingDst = 30064771299;
+      })
+      (mkIf cfg.swapLeftCtrlAndFn {
+        HIDKeyboardModifierMappingSrc = 30064771296;
+        HIDKeyboardModifierMappingDst = 1095216660483;
+      })
+      (mkIf cfg.swapLeftCtrlAndFn {
+        HIDKeyboardModifierMappingSrc = 1095216660483;
+        HIDKeyboardModifierMappingDst = 30064771296;
       })
     ];
 

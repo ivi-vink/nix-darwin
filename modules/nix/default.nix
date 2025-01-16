@@ -169,7 +169,7 @@ in
         type = types.package;
         default = pkgs.nix;
         defaultText = literalExpression "pkgs.nix";
-        description = lib.mdDoc ''
+        description = ''
           This option specifies the Nix package instance to use throughout the system.
         '';
       };
@@ -178,7 +178,7 @@ in
       useDaemon = mkOption {
         type = types.bool;
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           If set, Nix will use the daemon to perform operations.
           Use this instead of services.nix-daemon.enable if you don't want the
           daemon service to be managed for you.
@@ -188,12 +188,9 @@ in
       distributedBuilds = mkOption {
         type = types.bool;
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           Whether to distribute builds to the machines listed in
           {option}`nix.buildMachines`.
-
-          NOTE: This requires services.nix-daemon.enable for a
-          multi-user install.
         '';
       };
 
@@ -201,7 +198,7 @@ in
       daemonProcessType = mkOption {
         type = types.enum [ "Background" "Standard" "Adaptive" "Interactive" ];
         default = "Standard";
-        description = lib.mdDoc ''
+        description = ''
           Nix daemon process resource limits class. These limits propagate to
           build processes. `Standard` is the default process type
           and will apply light resource limits, throttling its CPU usage and I/O
@@ -216,7 +213,7 @@ in
       daemonIOLowPriority = mkOption {
         type = types.bool;
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           Whether the Nix daemon process should considered to be low priority when
           doing file system I/O.
         '';
@@ -228,7 +225,7 @@ in
             hostName = mkOption {
               type = types.str;
               example = "nixbuilder.example.org";
-              description = lib.mdDoc ''
+              description = ''
                 The hostname of the build machine.
               '';
             };
@@ -236,7 +233,7 @@ in
               type = types.enum [ null "ssh" "ssh-ng" ];
               default = "ssh";
               example = "ssh-ng";
-              description = lib.mdDoc ''
+              description = ''
                 The protocol used for communicating with the build machine.
                 Use `ssh-ng` if your remote builder and your
                 local Nix version support that improved protocol.
@@ -249,7 +246,7 @@ in
               type = types.nullOr types.str;
               default = null;
               example = "x86_64-linux";
-              description = lib.mdDoc ''
+              description = ''
                 The system type the build machine can execute derivations on.
                 Either this attribute or {var}`systems` must be
                 present, where {var}`system` takes precedence if
@@ -260,7 +257,7 @@ in
               type = types.listOf types.str;
               default = [ ];
               example = [ "x86_64-linux" "aarch64-linux" ];
-              description = lib.mdDoc ''
+              description = ''
                 The system types the build machine can execute derivations on.
                 Either this attribute or {var}`system` must be
                 present, where {var}`system` takes precedence if
@@ -271,7 +268,7 @@ in
               type = types.nullOr types.str;
               default = null;
               example = "builder";
-              description = lib.mdDoc ''
+              description = ''
                 The username to log in as on the remote host. This user must be
                 able to log in and run nix commands non-interactively. It must
                 also be privileged to build derivations, so must be included in
@@ -282,7 +279,7 @@ in
               type = types.nullOr types.str;
               default = null;
               example = "/root/.ssh/id_buildhost_builduser";
-              description = lib.mdDoc ''
+              description = ''
                 The path to the SSH private key with which to authenticate on
                 the build machine. The private key must not have a passphrase.
                 If null, the building user (root on NixOS machines) must have an
@@ -295,7 +292,7 @@ in
             maxJobs = mkOption {
               type = types.int;
               default = 1;
-              description = lib.mdDoc ''
+              description = ''
                 The number of concurrent jobs the build machine supports. The
                 build machine will enforce its own limits, but this allows hydra
                 to schedule better since there is no work-stealing between build
@@ -305,7 +302,7 @@ in
             speedFactor = mkOption {
               type = types.int;
               default = 1;
-              description = lib.mdDoc ''
+              description = ''
                 The relative speed of this builder. This is an arbitrary integer
                 that indicates the speed of this builder, relative to other
                 builders. Higher is faster.
@@ -315,7 +312,7 @@ in
               type = types.listOf types.str;
               default = [ ];
               example = [ "big-parallel" ];
-              description = lib.mdDoc ''
+              description = ''
                 A list of features mandatory for this builder. The builder will
                 be ignored for derivations that don't require all features in
                 this list. All mandatory features are automatically included in
@@ -326,7 +323,7 @@ in
               type = types.listOf types.str;
               default = [ ];
               example = [ "kvm" "big-parallel" ];
-              description = lib.mdDoc ''
+              description = ''
                 A list of features supported by this builder. The builder will
                 be ignored for derivations that require features not in this
                 list.
@@ -335,7 +332,7 @@ in
             publicHostKey = mkOption {
               type = types.nullOr types.str;
               default = null;
-              description = lib.mdDoc ''
+              description = ''
                 The (base64-encoded) public host key of this builder. The field
                 is calculated via {command}`base64 -w0 /etc/ssh/ssh_host_type_key.pub`.
                 If null, SSH will use its regular known-hosts file when connecting.
@@ -344,7 +341,7 @@ in
           };
         });
         default = [ ];
-        description = lib.mdDoc ''
+        description = ''
           This option lists the machines to be used if distributed builds are
           enabled (see {option}`nix.distributedBuilds`).
           Nix will perform derivations on those machines via SSH by copying the
@@ -358,21 +355,21 @@ in
         type = types.attrs;
         internal = true;
         default = { };
-        description = lib.mdDoc "Environment variables used by Nix.";
+        description = "Environment variables used by Nix.";
       };
 
       # Not in NixOS module
       configureBuildUsers = mkOption {
         type = types.bool;
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           Enable configuration for nixbld group and users.
         '';
       };
 
       nrBuildUsers = mkOption {
         type = types.int;
-        description = lib.mdDoc ''
+        description = ''
           Number of `nixbld` user accounts created to
           perform secure concurrent builds.  If you receive an error
           message saying that “all build users are currently in use”,
@@ -380,15 +377,39 @@ in
         '';
       };
 
+      channel = {
+        enable = mkOption {
+          description = ''
+            Whether the `nix-channel` command and state files are made available on the machine.
+
+            The following files are initialized when enabled:
+              - `/nix/var/nix/profiles/per-user/root/channels`
+              - `$HOME/.nix-defexpr/channels` (on login)
+
+            Disabling this option will not remove the state files from the system.
+          '';
+          type = types.bool;
+          default = true;
+        };
+      };
+
       # Definition differs substantially from NixOS module
       nixPath = mkOption {
         type = nixPathType;
-        default = [
+        default = lib.optionals cfg.channel.enable [
+          # Include default path <darwin-config>.
+          { darwin-config = "${config.environment.darwinConfig}"; }
+          "/nix/var/nix/profiles/per-user/root/channels"
+        ];
+
+        defaultText = lib.literalExpression ''
+          lib.optionals cfg.channel.enable [
             # Include default path <darwin-config>.
-            { darwin-config = "${config.environment.darwinConfig}"; }
+            { darwin-config = "''${config.environment.darwinConfig}"; }
             "/nix/var/nix/profiles/per-user/root/channels"
-          ];
-        description = lib.mdDoc ''
+          ]
+        '';
+        description = ''
           The default Nix expression search path, used by the Nix
           evaluator to look up paths enclosed in angle brackets
           (e.g. `<nixpkgs>`).
@@ -402,7 +423,7 @@ in
       checkConfig = mkOption {
         type = types.bool;
         default = true;
-        description = lib.mdDoc ''
+        description = ''
           If enabled (the default), checks for data type mismatches and that Nix
           can parse the generated nix.conf.
         '';
@@ -424,25 +445,25 @@ in
               from = mkOption {
                 type = referenceAttrs;
                 example = { type = "indirect"; id = "nixpkgs"; };
-                description = lib.mdDoc "The flake reference to be rewritten.";
+                description = "The flake reference to be rewritten.";
               };
               to = mkOption {
                 type = referenceAttrs;
                 example = { type = "github"; owner = "my-org"; repo = "my-nixpkgs"; };
-                description = lib.mdDoc "The flake reference {option}`from` is rewritten to.";
+                description = "The flake reference {option}`from` is rewritten to.";
               };
               flake = mkOption {
                 type = types.nullOr types.attrs;
                 default = null;
                 example = literalExpression "nixpkgs";
-                description = lib.mdDoc ''
+                description = ''
                   The flake input {option}`from` is rewritten to.
                 '';
               };
               exact = mkOption {
                 type = types.bool;
                 default = true;
-                description = lib.mdDoc ''
+                description = ''
                   Whether the {option}`from` reference needs to match exactly. If set,
                   a {option}`from` reference like `nixpkgs` does not
                   match with a reference like `nixpkgs/nixos-20.03`.
@@ -463,7 +484,7 @@ in
           }
         ));
         default = { };
-        description = lib.mdDoc ''
+        description = ''
           A system-wide flake registry.
         '';
       };
@@ -475,7 +496,7 @@ in
           keep-outputs = true
           keep-derivations = true
         '';
-        description = lib.mdDoc "Additional text appended to {file}`nix.conf`.";
+        description = "Additional text appended to {file}`nix.conf`.";
       };
 
       settings = mkOption {
@@ -487,7 +508,7 @@ in
               type = types.either types.int (types.enum [ "auto" ]);
               default = "auto";
               example = 64;
-              description = lib.mdDoc ''
+              description = ''
                 This option defines the maximum number of jobs that Nix will try to
                 build in parallel. The default is auto, which means it will use all
                 available logical cores. It is recommend to set it to the total
@@ -500,11 +521,13 @@ in
               type = types.bool;
               default = false;
               example = true;
-              description = lib.mdDoc ''
+              description = ''
                 If set to true, Nix automatically detects files in the store that have
                 identical contents, and replaces them with hard links to a single copy.
-                This saves disk space. If set to false (the default), you can still run
-                nix-store --optimise to get rid of duplicate files.
+                This saves disk space. If set to false (the default), you can enable
+                {option}`nix.optimise.automatic` to run {command}`nix-store --optimise`
+                periodically to get rid of duplicate files. You can also run
+                {command}`nix-store --optimise` manually.
               '';
             };
 
@@ -512,7 +535,7 @@ in
               type = types.int;
               default = 0;
               example = 64;
-              description = lib.mdDoc ''
+              description = ''
                 This option defines the maximum number of concurrent tasks during
                 one build. It affects, e.g., -j option for make.
                 The special value 0 means that the builder should use all
@@ -525,7 +548,7 @@ in
             sandbox = mkOption {
               type = types.either types.bool (types.enum [ "relaxed" ]);
               default = false;
-              description = lib.mdDoc ''
+              description = ''
                 If set, Nix will perform builds in a sandboxed environment that it
                 will set up automatically for each build. This prevents impurities
                 in builds by disallowing access to dependencies outside of the Nix
@@ -539,7 +562,7 @@ in
               type = types.listOf types.str;
               default = [ ];
               example = [ "/dev" "/proc" ];
-              description = lib.mdDoc ''
+              description = ''
                 Directories from the host filesystem to be included
                 in the sandbox.
               '';
@@ -547,7 +570,7 @@ in
 
             substituters = mkOption {
               type = types.listOf types.str;
-              description = lib.mdDoc ''
+              description = ''
                 List of binary cache URLs used to obtain pre-built binaries
                 of Nix packages.
 
@@ -559,7 +582,7 @@ in
               type = types.listOf types.str;
               default = [ ];
               example = [ "https://hydra.nixos.org/" ];
-              description = lib.mdDoc ''
+              description = ''
                 List of binary cache URLs that non-root users can use (in
                 addition to those specified using
                 {option}`nix.settings.substituters`) by passing
@@ -570,7 +593,7 @@ in
             require-sigs = mkOption {
               type = types.bool;
               default = true;
-              description = lib.mdDoc ''
+              description = ''
                 If enabled (the default), Nix will only download binaries from binary caches if
                 they are cryptographically signed with any of the keys listed in
                 {option}`nix.settings.trusted-public-keys`. If disabled, signatures are neither
@@ -582,7 +605,7 @@ in
             trusted-public-keys = mkOption {
               type = types.listOf types.str;
               example = [ "hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=" ];
-              description = lib.mdDoc ''
+              description = ''
                 List of public keys used to sign binary caches. If
                 {option}`nix.settings.trusted-public-keys` is enabled,
                 then Nix will use a binary from a binary cache if and only
@@ -594,9 +617,8 @@ in
 
             trusted-users = mkOption {
               type = types.listOf types.str;
-              default = [ "root" ];
               example = [ "root" "alice" "@admin" ];
-              description = lib.mdDoc ''
+              description = ''
                 A list of names of users that have additional rights when
                 connecting to the Nix daemon, such as the ability to specify
                 additional binary caches, or to import unsigned NARs. You
@@ -626,7 +648,7 @@ in
               type = types.listOf types.str;
               default = [ "*" ];
               example = [ "@admin" "@builders" "alice" "bob" ];
-              description = lib.mdDoc ''
+              description = ''
                 A list of names of users (separated by whitespace) that are
                 allowed to connect to the Nix daemon. As with
                 {option}`nix.settings.trusted-users`, you can specify groups by
@@ -639,7 +661,7 @@ in
           };
         };
         default = { };
-        description = lib.mdDoc ''
+        description = ''
           Configuration for Nix, see
           <https://nixos.org/manual/nix/stable/#sec-conf-file>
           for avalaible options.
@@ -662,7 +684,7 @@ in
         nixPackage
         pkgs.nix-info
       ]
-      ++ optional (config.programs.bash.enableCompletion) pkgs.nix-bash-completions;
+      ++ optional (config.programs.bash.completion.enable) pkgs.nix-bash-completions;
 
     environment.etc."nix/nix.conf".source = nixConf;
 
@@ -677,7 +699,11 @@ in
       "f3e03d851c240c1aa7daccd144ee929f0f5971982424c868c434eb6030e961d4"  # DeterminateSystems Nix installer 0.10.0
       "c6080216f2a170611e339c3f46e4e1d61aaf0d8b417ad93ade8d647da1382c11"  # DeterminateSystems Nix installer 0.14.0
       "97f4135d262ca22d65c9554aad795c10a4491fa61b67d9c2430f4d82bbfec9a2"  # DeterminateSystems Nix installer 0.15.1
-      "5d23e6d7015756c6f300f8cd558ec4d9234ca61deefd4f2478e91a49760b0747" # DeterminateSystems Nix installer 0.16.0+
+      "5d23e6d7015756c6f300f8cd558ec4d9234ca61deefd4f2478e91a49760b0747"  # DeterminateSystems Nix installer 0.16.0
+      "e4974acb79c56148cb8e92137fa4f2de9b7356e897b332fc4e6769e8c0b83e18"  # DeterminateSystems Nix installer 0.20.0
+      "966d22ef5bb9b56d481e8e0d5f7ca2deaf4d24c0f0fc969b2eeaa7ae0aa42907"  # DeterminateSystems Nix installer 0.22.0
+      "24797ac05542ff8b52910efc77870faa5f9e3275097227ea4e50c430a5f72916"  # lix-installer 0.17.1 with flakes
+      "b027b5cad320b5b8123d9d0db9f815c3f3921596c26dc3c471457098e4d3cc40"  # lix-installer 0.17.1 without flakes
     ];
 
     environment.etc."nix/registry.json".text = builtins.toJSON {
@@ -733,36 +759,36 @@ in
         { assertion = elem "nixbld" config.users.knownGroups -> elem "nixbld" createdGroups; message = "refusing to delete group nixbld in users.knownGroups, this would break nix"; }
         { assertion = elem "_nixbld1" config.users.knownGroups -> elem "_nixbld1" createdUsers; message = "refusing to delete user _nixbld1 in users.knownUsers, this would break nix"; }
         { assertion = config.users.groups ? "nixbld" -> config.users.groups.nixbld.members != []; message = "refusing to remove all members from nixbld group, this would break nix"; }
+
+        {
+          # Should be fixed in Lix by https://gerrit.lix.systems/c/lix/+/2100
+          # Lix 2.92.0 will set `VERSION_SUFFIX` to `""`; `lib.versionAtLeast "" "pre20241107"` will return `true`.
+          assertion = cfg.settings.auto-optimise-store -> (cfg.package.pname == "lix" && (isNixAtLeast "2.92.0" && versionAtLeast (strings.removePrefix "-" cfg.package.VERSION_SUFFIX) "pre20241107"));
+          message = "`nix.settings.auto-optimise-store` is known to corrupt the Nix Store, please use `nix.optimise.automatic` instead.";
+        }
       ];
 
     # Not in NixOS module
     warnings = [
-      (mkIf (!config.services.activate-system.enable && cfg.distributedBuilds) "services.activate-system is not enabled, a reboot could cause distributed builds to stop working.")
       (mkIf (!cfg.distributedBuilds && cfg.buildMachines != []) "nix.distributedBuilds is not enabled, build machines won't be configured.")
     ];
 
     # Not in NixOS module
-    nix.nixPath = mkMerge [
-      (mkIf (config.system.stateVersion < 2) (mkDefault
-      [ "darwin=$HOME/.nix-defexpr/darwin"
-        "darwin-config=$HOME/.nixpkgs/darwin-configuration.nix"
-        "/nix/var/nix/profiles/per-user/root/channels"
-      ]))
-      (mkIf (config.system.stateVersion > 3) (mkOrder 1200
-      [ { darwin-config = "${config.environment.darwinConfig}"; }
-        "/nix/var/nix/profiles/per-user/root/channels"
-      ]))
-    ];
+    nix.nixPath = mkIf (config.system.stateVersion < 2) (mkDefault [
+      "darwin=$HOME/.nix-defexpr/darwin"
+      "darwin-config=$HOME/.nixpkgs/darwin-configuration.nix"
+      "/nix/var/nix/profiles/per-user/root/channels"
+    ]);
 
     # Set up the environment variables for running Nix.
     environment.variables = cfg.envVars // { NIX_PATH = cfg.nixPath; };
 
-    environment.extraInit =
-      ''
+    environment.extraInit = mkMerge [
+      (mkIf cfg.channel.enable ''
         if [ -e "$HOME/.nix-defexpr/channels" ]; then
           export NIX_PATH="$HOME/.nix-defexpr/channels''${NIX_PATH:+:$NIX_PATH}"
         fi
-      '' +
+      '')
       # Not in NixOS module
       ''
         # Set up secure multi-user builds: non-root users build through the
@@ -770,7 +796,12 @@ in
         if [ ! -w /nix/var/nix/db ]; then
             export NIX_REMOTE=daemon
         fi
-      '';
+      ''
+    ];
+
+    environment.extraSetup = mkIf (!cfg.channel.enable) ''
+      rm --force $out/bin/nix-channel
+    '';
 
     nix.nrBuildUsers = mkDefault (max 32 (if cfg.settings.max-jobs == "auto" then 0 else cfg.settings.max-jobs));
 
@@ -803,10 +834,10 @@ in
       done
     '';
 
-    # Legacy configuration conversion.
     nix.settings = mkMerge [
       {
         trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+        trusted-users = [ "root" ];
         substituters = mkAfter [ "https://cache.nixos.org/" ];
 
         # Not implemented yet

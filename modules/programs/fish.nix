@@ -9,7 +9,7 @@ let
   cfg = config.programs.fish;
 
   fishAliases = concatStringsSep "\n" (
-    mapAttrsFlatten (k: v: "alias ${k} ${escapeShellArg v}")
+    mapAttrsToList (k: v: "alias ${k} ${escapeShellArg v}")
       (filterAttrs (k: v: v != null) cfg.shellAliases)
   );
 
@@ -51,16 +51,18 @@ in
 
       enable = mkOption {
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           Whether to configure fish as an interactive shell.
         '';
         type = types.bool;
       };
 
+      package = lib.mkPackageOption pkgs "fish" { };
+
       useBabelfish = mkOption {
         type = types.bool;
         default = false;
-        description = lib.mdDoc ''
+        description = ''
           If enabled, the configured environment will be translated to native fish using [babelfish](https://github.com/bouk/babelfish).
           Otherwise, [foreign-env](https://github.com/oh-my-fish/plugin-foreign-env) will be used.
         '';
@@ -69,7 +71,7 @@ in
       babelfishPackage = mkOption {
         type = types.package;
         default = pkgs.babelfish;
-        description = lib.mdDoc ''
+        description = ''
           The babelfish package to use when useBabelfish is
           set to true.
         '';
@@ -78,7 +80,7 @@ in
       vendor.config.enable = mkOption {
         type = types.bool;
         default = true;
-        description = lib.mdDoc ''
+        description = ''
           Whether fish should source configuration snippets provided by other packages.
         '';
       };
@@ -86,7 +88,7 @@ in
       vendor.completions.enable = mkOption {
         type = types.bool;
         default = true;
-        description = lib.mdDoc ''
+        description = ''
           Whether fish should use completion files provided by other packages.
         '';
       };
@@ -94,14 +96,14 @@ in
       vendor.functions.enable = mkOption {
         type = types.bool;
         default = true;
-        description = lib.mdDoc ''
+        description = ''
           Whether fish should autoload fish functions provided by other packages.
         '';
       };
 
       shellAliases = mkOption {
         default = config.environment.shellAliases;
-        description = lib.mdDoc ''
+        description = ''
           Set of aliases for fish shell. See {option}`environment.shellAliases`
           for an option format description.
         '';
@@ -110,7 +112,7 @@ in
 
       shellInit = mkOption {
         default = "";
-        description = lib.mdDoc ''
+        description = ''
           Shell script code called during fish shell initialisation.
         '';
         type = types.lines;
@@ -118,7 +120,7 @@ in
 
       loginShellInit = mkOption {
         default = "";
-        description = lib.mdDoc ''
+        description = ''
           Shell script code called during fish login shell initialisation.
         '';
         type = types.lines;
@@ -126,7 +128,7 @@ in
 
       interactiveShellInit = mkOption {
         default = "";
-        description = lib.mdDoc ''
+        description = ''
           Shell script code called during interactive fish shell initialisation.
         '';
         type = types.lines;
@@ -134,7 +136,7 @@ in
 
       promptInit = mkOption {
         default = "";
-        description = lib.mdDoc ''
+        description = ''
           Shell script code used to initialise fish prompt.
         '';
         type = types.lines;
@@ -238,7 +240,7 @@ in
           ++ optional cfg.vendor.functions.enable "/share/fish/vendor_functions.d";
       }
 
-      { systemPackages = [ pkgs.fish ]; }
+      { systemPackages = [ cfg.package ]; }
     ];
   };
 
